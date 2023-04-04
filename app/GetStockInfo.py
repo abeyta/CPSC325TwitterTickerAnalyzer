@@ -4,17 +4,8 @@ import yfinance as yf
 import plotly.graph_objs as go
 
 def get_stock_figure(ticker):
-    # load tickers from csv
-    df = pd.read_csv("tickers.csv", index_col=0)
-    # print(df)
-
     # import ticker data
-    # for ticker in df.index:
-    #     # print(ticker)
-    #     data = yf.download(tickers=ticker, period="1d", interval="1m")
-    #     # print(data)
-    data = yf.download(tickers=ticker[1:], period="1d", interval="1m")
-    print(data)
+    data = yf.download(tickers=ticker, period="1d", interval="1m")
 
     # declare figure
     fig = go.Figure()
