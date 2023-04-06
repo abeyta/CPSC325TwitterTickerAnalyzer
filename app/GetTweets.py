@@ -1,7 +1,7 @@
 import os
 import json
 import pandas as pd
-from google.cloud import pubsub
+# from google.cloud import pubsub
 import requests
 import json
 
