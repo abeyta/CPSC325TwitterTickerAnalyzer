@@ -13,9 +13,9 @@ with open("twitter_keys.json") as infile:
 #define search twitter function
 def search_twitter(query, tweet_fields, bearer_token = token):
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
-
+    print(query + " lang:en")
     url = "https://api.twitter.com/2/tweets/search/recent?query={}&{}".format(
-        query, tweet_fields
+        query + " lang:en", tweet_fields
     )
     response = requests.request("GET", url, headers=headers)
 
