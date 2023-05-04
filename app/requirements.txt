@@ -3,3 +3,6 @@ pandas~=1.1.5
 yfinance~=0.2.10
 plotly~=5.13.0
 numpy~=1.19.5
+tensorflow==2.9.0
+transformers~=4.18.0
+scikit-learn

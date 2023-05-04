@@ -1,21 +1,25 @@
 import os
 import json
+import re
 import pandas as pd
 # from google.cloud import pubsub
 import requests
 import json
+from sklearn.neighbors import KNeighborsClassifier as KNN
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_keys.json"
 with open("twitter_keys.json") as infile:
         twitter_keys = json.load(infile)
         token = twitter_keys["bearer_token"]
 
+URL = "https://us-central1-project-381921.cloudfunctions.net/model"
+
 #define search twitter function
 def search_twitter(query, tweet_fields, bearer_token = token):
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
     print(query + " lang:en")
     url = "https://api.twitter.com/2/tweets/search/recent?query={}&{}".format(
-        query + " lang:en", tweet_fields
+        query + " lang:en&max_results=50", tweet_fields
     )
     response = requests.request("GET", url, headers=headers)
 
@@ -25,56 +29,51 @@ def search_twitter(query, tweet_fields, bearer_token = token):
         raise Exception(response.status_code, response.text)
     return response.json()
 
-tweets = search_twitter("AAPL", "tweet.fields=created_at,text")
-with open("tweets.json", "w") as write_file:
-    json.dump(tweets, write_file, indent=4)
+def clean_tweets(tweets):
+    # Function to filter out tweets that have more than 2 tickers in the tweet
+    tweets_list = []
+    count = 0
+    tickers_df = pd.read_csv("tickers.csv", index_col=0)
+    for tweet in tweets["data"]:
+        for ticker in tickers_df.index:
+            result = tweet["text"].find(ticker)
+            if result != -1:
+                count += 1
+        if count <= 3:
+            # check for https links in the tweet
+            result = tweet["text"].find("https")
+            if result == -1:
+                # if tweet containes a @tag, replace the tagged user with "USER"
+                # this is to prevent the model from learning that a tweet with a tagged user is positive or negative  
+                result = tweet["text"].find("@")
+                if result != -1:
+                    tweet["text"] = re.sub(r'{}.*?\s'.format('@'), '{} '.format('USER'), tweet["text"])
+                    # tweet["text"] = tweet["text"][:result] + "USER" + tweet["text"][result+1:]
+                tweets_list.append(tweet["text"])
+        count = 0
+    return tweets_list
 
+def predict_tweets(ticker_picked, tweet_fields):
+    tweets = search_twitter(ticker_picked, tweet_fields)
+    tweets_list = []
+    tweets = clean_tweets(tweets)
+    for tweet in tweets:
+        tweets_list.append(tweet)
+    # make an http request to my cloud function
+    headers = {"Content-Type": "application/json"}
+    data = {"tweets": tweets_list}
+    print(data)
+    try:
+        prediction = requests.post(URL, headers=headers, data=json.dumps(data))
+        return prediction.json()
+    except:
+        return "Max memory limit reached."
 
-
-# # need to replace this with the path to your topic
-# TOPIC_PATH = "projects/cloudfunctiondemo-376417/topics/tweets"
-
-# class TweetStreamer(tweepy.StreamingClient):
-#     def __init__(self, bearer_token):
-#         super().__init__(bearer_token=bearer_token, wait_on_rate_limit=True)
+def make_stock_prediction(X, y):
+    KNNClassifier = KNN(n_neighbors=5)
+    newX = [[x] for x in X]
+    print(X.tolist())
+    KNNClassifier.fit(X.tolist(), y)
+    return KNNClassifier.predict([[0.5, 0.5]])
     
-#     def clear_and_set_filter_rules(self, filter_terms):
-#         # clear out any existing rules
-#         response = self.get_rules()
-#         if response.data is not None:
-#             rule_ids = [rule.id for rule in response.data]
-#             self.delete_rules(rule_ids)
-#         rules = [tweepy.StreamRule(term) for term in filter_terms]
-#         self.add_rules(rules)
-#         response = self.get_rules()
-#         print("added number of rules:", len(response.data))
-
-#     def on_connect(self):
-#         print("Connection successful")
-
-#     def on_disconnect(self):
-#         print("Connection disconnected")
-
-#     def on_tweet(self, tweet):
-#         created_at = pd.Timestamp(tweet.created_at).strftime("%Y-%m-%d %H:%M:%S")
-#         values = {"tweet_id": tweet.id, "author_id": tweet.author_id, "created_at": created_at, "text": tweet.text}
-#         print(values)
-#         publish_tweet(values)
-
-# def publish_tweet(tweet_dict):
-#     publisher_client = pubsub.PublisherClient()
-#     tweet_str = json.dumps(tweet_dict).encode("utf-8")
-#     future = publisher_client.publish(TOPIC_PATH, tweet_str)
-#     print("published:", future.result())
-
-# if __name__ == "__main__":
-#     with open("twitter_keys.json") as infile:
-#         twitter_keys = json.load(infile)
-#         token = twitter_keys["bearer_token"]
-#     streamer = TweetStreamer(token)
     
-    
-#     filter_terms = ["from:ZagMBB", "from:GinaSprint"]
-#     streamer.clear_and_set_filter_rules(filter_terms)
-    
-#     streamer.filter(tweet_fields=["created_at", "author_id"])
