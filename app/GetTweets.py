@@ -14,7 +14,7 @@ with open("twitter_keys.json") as infile:
 
 URL = "https://us-central1-project-381921.cloudfunctions.net/model"
 
-#define search twitter function
+# search twitter function for tweets
 def search_twitter(query, tweet_fields, bearer_token = token):
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
     print(query + " lang:en")
@@ -29,8 +29,9 @@ def search_twitter(query, tweet_fields, bearer_token = token):
         raise Exception(response.status_code, response.text)
     return response.json()
 
+# Function to filter out tweets that have more than 2 tickers in the tweet
+# and contains a link to a website
 def clean_tweets(tweets):
-    # Function to filter out tweets that have more than 2 tickers in the tweet
     tweets_list = []
     count = 0
     tickers_df = pd.read_csv("tickers.csv", index_col=0)
@@ -53,6 +54,7 @@ def clean_tweets(tweets):
         count = 0
     return tweets_list
 
+# Function to predict the sentiment of the tweets
 def predict_tweets(ticker_picked, tweet_fields):
     tweets = search_twitter(ticker_picked, tweet_fields)
     tweets_list = []
@@ -69,6 +71,7 @@ def predict_tweets(ticker_picked, tweet_fields):
     except:
         return "Max memory limit reached."
 
+# Make a prediction with the KNN classifier
 def make_stock_prediction(X, y):
     KNNClassifier = KNN(n_neighbors=5)
     newX = [[x] for x in X]
